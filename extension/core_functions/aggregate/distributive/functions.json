@@ -108,6 +108,13 @@
         "type": "aggregate_function_set"
     },
     {
+        "name": "first_change",
+        "parameters": "value",
+        "description": "Aggregate that detects the first point where a column changes. Returns a struct with timestamp and value of the first meaningful change. Requires ORDER BY clause.",
+        "example": "first_change(price ORDER BY ts)",
+        "type": "aggregate_function_set"
+    },
+    {
         "name": "kahan_sum",
         "parameters": "arg",
         "description": "Calculates the sum using a more accurate floating point summation (Kahan Sum).",

@@ -195,6 +195,16 @@ struct EntropyFun {
 	static AggregateFunctionSet GetFunctions();
 };
 
+struct FirstChangeFun {
+	static constexpr const char *Name = "first_change";
+	static constexpr const char *Parameters = "value";
+	static constexpr const char *Description = "Aggregate that detects the first point where a column changes. Returns a struct with timestamp and value of the first meaningful change. Requires ORDER BY clause.";
+	static constexpr const char *Example = "first_change(price ORDER BY ts)";
+	static constexpr const char *Categories = "";
+
+	static AggregateFunctionSet GetFunctions();
+};
+
 struct KahanSumFun {
 	static constexpr const char *Name = "kahan_sum";
 	static constexpr const char *Parameters = "arg";

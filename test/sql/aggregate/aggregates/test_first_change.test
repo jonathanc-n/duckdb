@@ -1,0 +1,159 @@
+# name: test/sql/aggregate/aggregates/test_first_change.test
+# description: Test first_change aggregate function
+# group: [aggregates]
+
+statement ok
+PRAGMA enable_verification
+
+# Minimal test - just verify the function can be called
+statement ok
+CREATE TABLE trades(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO trades VALUES 
+    ('2024-01-01 10:00:00', 100),
+    ('2024-01-01 10:01:00', 100),
+    ('2024-01-01 10:02:00', 100),
+    ('2024-01-01 10:03:00', 105),
+    ('2024-01-01 10:04:00', 105);
+
+# Test with no change (all same values)
+statement ok
+CREATE TABLE no_change(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO no_change VALUES 
+    ('2024-01-01 10:00:00', 100),
+    ('2024-01-01 10:01:00', 100),
+    ('2024-01-01 10:02:00', 100);
+
+query T
+SELECT first_change(price ORDER BY ts) FROM no_change
+----
+NULL
+
+# Test with change at beginning (first value is different from second)
+statement ok
+CREATE TABLE change_at_start(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO change_at_start VALUES 
+    ('2024-01-01 10:00:00', 100),
+    ('2024-01-01 10:01:00', 105),
+    ('2024-01-01 10:02:00', 105);
+
+query T
+SELECT first_change(price ORDER BY ts) FROM change_at_start
+----
+{timestamp: 2024-01-01 10:01:00, value: 105}
+
+# Test with multiple changes (should return first change)
+statement ok
+CREATE TABLE multiple_changes(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO multiple_changes VALUES 
+    ('2024-01-01 10:00:00', 100),
+    ('2024-01-01 10:01:00', 100),
+    ('2024-01-01 10:02:00', 105),
+    ('2024-01-01 10:03:00', 110),
+    ('2024-01-01 10:04:00', 110);
+
+query T
+SELECT first_change(price ORDER BY ts) FROM multiple_changes
+----
+{timestamp: 2024-01-01 10:02:00, value: 105}
+
+# Test with NULL values
+statement ok
+CREATE TABLE with_nulls(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO with_nulls VALUES 
+    ('2024-01-01 10:00:00', 100),
+    ('2024-01-01 10:01:00', NULL),
+    ('2024-01-01 10:02:00', 105);
+
+query T
+SELECT first_change(price ORDER BY ts) FROM with_nulls
+----
+{timestamp: 2024-01-01 10:01:00, value: NULL}
+
+# Test with NULL to non-NULL change
+statement ok
+CREATE TABLE null_to_value(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO null_to_value VALUES 
+    ('2024-01-01 10:00:00', NULL),
+    ('2024-01-01 10:01:00', NULL),
+    ('2024-01-01 10:02:00', 100);
+
+query T
+SELECT first_change(price ORDER BY ts) FROM null_to_value
+----
+{timestamp: 2024-01-01 10:02:00, value: 100}
+
+# Test with GROUP BY
+statement ok
+CREATE TABLE grouped_data(grp INTEGER, ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO grouped_data VALUES 
+    (1, '2024-01-01 10:00:00', 100),
+    (1, '2024-01-01 10:01:00', 105),
+    (2, '2024-01-01 10:00:00', 200),
+    (2, '2024-01-01 10:01:00', 200),
+    (2, '2024-01-01 10:02:00', 210);
+
+query IT
+SELECT grp, first_change(price ORDER BY ts) FROM grouped_data GROUP BY grp ORDER BY grp
+----
+1	{timestamp: 2024-01-01 10:01:00, value: 105}
+2	{timestamp: 2024-01-01 10:02:00, value: 210}
+
+# Test with double values
+statement ok
+CREATE TABLE double_trades(ts TIMESTAMP, price DOUBLE);
+
+statement ok
+INSERT INTO double_trades VALUES 
+    ('2024-01-01 10:00:00', 100.5),
+    ('2024-01-01 10:01:00', 100.5),
+    ('2024-01-01 10:02:00', 105.7);
+
+query T
+SELECT first_change(price ORDER BY ts) FROM double_trades
+----
+{timestamp: 2024-01-01 10:02:00, value: 105.7}
+
+# Test with string values
+statement ok
+CREATE TABLE string_changes(ts TIMESTAMP, status VARCHAR);
+
+statement ok
+INSERT INTO string_changes VALUES 
+    ('2024-01-01 10:00:00', 'active'),
+    ('2024-01-01 10:01:00', 'active'),
+    ('2024-01-01 10:02:00', 'inactive');
+
+query T
+SELECT first_change(status ORDER BY ts) FROM string_changes
+----
+{timestamp: 2024-01-01 10:02:00, value: inactive}
+
+# Test with descending ORDER BY
+statement ok
+CREATE TABLE desc_order(ts TIMESTAMP, price INTEGER);
+
+statement ok
+INSERT INTO desc_order VALUES 
+    ('2024-01-01 10:00:00', 100),
+    ('2024-01-01 10:01:00', 100),
+    ('2024-01-01 10:02:00', 105);
+
+query T
+SELECT first_change(price ORDER BY ts DESC) FROM desc_order
+----
+{timestamp: 2024-01-01 10:01:00, value: 100}
+
